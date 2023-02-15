@@ -1,3 +1,4 @@
+#[allow(unreachable_code)]
 use core::panic;
 // Newly added dependencies
 use core::time::Duration;
@@ -19,6 +20,8 @@ use datafusion::arrow::{
     datatypes::DataType, datatypes::Field, datatypes::Schema, record_batch::RecordBatch,
     util::pretty,
 };
+
+use datafusion::execution::{human_readable_size, MemoryManager};
 
 use datafusion::datasource::{
     file_format::csv::{CsvFormat, DEFAULT_CSV_EXTENSION},
@@ -58,6 +61,9 @@ struct DataFusionBenchmarkOpt {
     /// Number of partitions to process in parallel
     #[structopt(short = "n", long = "partitions", default_value = "1")]
     partitions: usize,
+
+    #[structopt(short = "x", long = "memory-size", default_value = "1228800")]
+    memory_size: usize,
 
     /// Batch size when reading CSV or Parquet files, usually from 32 to 2^n
     #[structopt(short = "s", long = "batch-size", default_value = "8192")]
@@ -107,7 +113,12 @@ async fn benchmark_datafusion(opt: DataFusionBenchmarkOpt) -> Result<Vec<RecordB
         .with_collect_statistics(!opt.disable_statistics);
     // let ctx = SessionContext::with_config(config);
 
-    let runtime_config = RuntimeConfig::new().with_memory_limit(12288, 1.0);
+    let runtime_config = RuntimeConfig::new().with_memory_limit(opt.memory_size, 1.0);
+    println!(
+        "memory_size: {}",
+        human_readable_size(runtime_config.memory_manager.pool_size())
+    );
+    println!("batch_size: {}", config.batch_size());
     let runtime = Arc::new(RuntimeEnv::new(runtime_config)?);
     let ctx = SessionContext::with_config_rt(config, runtime);
 
@@ -299,21 +310,21 @@ async fn execute_query(ctx: &SessionContext, sql: &str, debug: bool) -> Result<V
     }
     let task_ctx = ctx.task_ctx();
 
-    let physical_plan_2 = physical_plan.clone();
-    let task_ctx_2 = task_ctx.clone();
-    let background_thread = tokio::task::spawn(collect(physical_plan_2, task_ctx_2));
+    // let physical_plan_2 = physical_plan.clone();
+    // let task_ctx_2 = task_ctx.clone();
+    // let background_thread = tokio::task::spawn(collect(physical_plan_2, task_ctx_2));
 
-    thread::sleep(Duration::from_secs(1));
-    task_ctx.suspend();
+    // thread::sleep(Duration::from_secs(1));
+    // task_ctx.suspend();
 
-    let e = if let Err(e) = background_thread.await.unwrap() {
-        e
-    } else {
-        panic!("not suspended");
-    };
+    // let e = if let Err(e) = background_thread.await.unwrap() {
+    //     e
+    // } else {
+    //     panic!("not suspended");
+    // };
 
-    dbg!(e);
-    task_ctx.resume();
+    // dbg!(e);
+    // task_ctx.resume();
     let result = collect(physical_plan.clone(), task_ctx).await?;
 
     if debug {
