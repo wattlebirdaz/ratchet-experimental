@@ -100,8 +100,6 @@ enum TpchOpt {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("My pid is {}", process::id());
-
     env_logger::init();
     match TpchOpt::from_args() {
         TpchOpt::Benchmark(opt) => benchmark_datafusion(opt).await.map(|_| ()),
@@ -290,7 +288,6 @@ fn get_query_sql(query: usize) -> Result<Vec<String>> {
 }
 
 async fn execute_query(ctx: &SessionContext, sql: &str, debug: bool) -> Result<Vec<RecordBatch>> {
-    println!("My pid is {}", process::id());
     let plan = ctx.sql(sql).await?;
     let plan = plan.to_unoptimized_plan();
 
@@ -319,7 +316,7 @@ async fn execute_query(ctx: &SessionContext, sql: &str, debug: bool) -> Result<V
         reg,
     ));
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // tokio::time::sleep(Duration::from_secs(2)).await;
     // handle.abort();
 
     let result = result.await.unwrap().unwrap().unwrap();
