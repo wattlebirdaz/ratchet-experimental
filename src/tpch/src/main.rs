@@ -14,6 +14,8 @@ use std::{
     time::{Instant, SystemTime},
 };
 
+use futures::future::{AbortHandle, Abortable};
+
 use structopt::StructOpt;
 
 use datafusion::arrow::{
@@ -114,10 +116,10 @@ async fn benchmark_datafusion(opt: DataFusionBenchmarkOpt) -> Result<Vec<RecordB
     // let ctx = SessionContext::with_config(config);
 
     let runtime_config = RuntimeConfig::new().with_memory_limit(opt.memory_size, 1.0);
-    println!(
-        "memory_size: {}",
-        human_readable_size(runtime_config.memory_manager.pool_size())
-    );
+    // println!(
+    //     "memory_size: {}",
+    //     human_readable_size(runtime_config.memory_manager.pool_size())
+    // );
     println!("batch_size: {}", config.batch_size());
     let runtime = Arc::new(RuntimeEnv::new(runtime_config)?);
     let ctx = SessionContext::with_config_rt(config, runtime);
@@ -310,22 +312,17 @@ async fn execute_query(ctx: &SessionContext, sql: &str, debug: bool) -> Result<V
     }
     let task_ctx = ctx.task_ctx();
 
-    // let physical_plan_2 = physical_plan.clone();
-    // let task_ctx_2 = task_ctx.clone();
-    // let background_thread = tokio::task::spawn(collect(physical_plan_2, task_ctx_2));
+    let (handle, reg) = AbortHandle::new_pair();
 
-    // thread::sleep(Duration::from_secs(1));
-    // task_ctx.suspend();
+    let result = tokio::task::spawn(Abortable::new(
+        collect(physical_plan.clone(), task_ctx),
+        reg,
+    ));
 
-    // let e = if let Err(e) = background_thread.await.unwrap() {
-    //     e
-    // } else {
-    //     panic!("not suspended");
-    // };
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    // handle.abort();
 
-    // dbg!(e);
-    // task_ctx.resume();
-    let result = collect(physical_plan.clone(), task_ctx).await?;
+    let result = result.await.unwrap().unwrap().unwrap();
 
     if debug {
         println!(
